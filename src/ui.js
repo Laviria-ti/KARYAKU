@@ -1,7 +1,10 @@
 import { CERITA_USAHA, DEMO, KATEGORI, PLACEHOLDER_IMAGE } from "./products.js";
 import {
+  ambilPemberitahuan,
   ambilProduk,
+  eksporJSON,
   hapusProduk,
+  imporJSON,
   loginDemo,
   logoutDemo,
   penyimpananOk,
@@ -88,6 +91,16 @@ function layout({ aktif = "", badge = "", children = [] }) {
   ]);
 
   const isi = [...children];
+  const pesanPulihkan = ambilPemberitahuan();
+  if (pesanPulihkan) {
+    isi.unshift(
+      el("div", {
+        class: "alert alert-warning",
+        role: "status",
+        text: pesanPulihkan,
+      }),
+    );
+  }
   if (!penyimpananOk()) {
     isi.unshift(
       el("div", {
@@ -534,46 +547,92 @@ function renderDashboard() {
   }
 
   const statProduk = el("strong", { class: "stat-angka" });
-  const statUnggulan = el("strong", { class: "stat-angka" });
+  const statStok = el("strong", { class: "stat-angka" });
   const statKategori = el("strong", { class: "stat-angka" });
-  const daftar = el("div", { class: "daftar-produk" });
+  const daftar = el("tbody");
+
+  const tabel = el("div", { class: "tabel-wrap" }, [
+    el("table", { class: "tabel-produk" }, [
+      el("thead", {}, [
+        el(
+          "tr",
+          {},
+          ["Foto", "Nama", "Kategori", "Harga", "Stok", "Aksi"].map((label) =>
+            el("th", { scope: "col", text: label }),
+          ),
+        ),
+      ]),
+      daftar,
+    ]),
+  ]);
+
+  const dataAlert = el("p", { class: "alert", role: "status", hidden: true });
+
+  function beriPesanData(teks, varian = "success") {
+    dataAlert.textContent = teks;
+    dataAlert.className = `alert ${varian === "error" ? "error" : "success"}`;
+    dataAlert.hidden = false;
+  }
 
   function perbaruiData() {
     const produk = ambilProduk();
     statProduk.textContent = String(produk.length);
-    statUnggulan.textContent = String(produk.filter((p) => p.unggulan).length);
+    statStok.textContent = String(
+      produk.reduce((total, p) => total + (Number.isInteger(p.stok) ? p.stok : 0), 0),
+    );
+    statKategori.textContent = String(new Set(produk.map((p) => p.kategori)).size);
 
-    const hitung = new Map();
-    produk.forEach((p) => hitung.set(p.kategori, (hitung.get(p.kategori) || 0) + 1));
-    const terbanyak = [...hitung.entries()].sort((a, b) => b[1] - a[1])[0];
-    statKategori.textContent = terbanyak ? terbanyak[0] : "—";
+    if (!produk.length) {
+      daftar.replaceChildren(
+        el("tr", {}, [
+          el("td", {
+            class: "muted",
+            colspan: "6",
+            text: "Belum ada produk. Tambahkan produk pertama atau impor data JSON.",
+          }),
+        ]),
+      );
+      return;
+    }
 
     daftar.replaceChildren(
       ...produk.map((p) =>
-        el("div", { class: "product-row" }, [
-          el("img", { src: p.imageUrl, alt: "", class: "thumb" }),
-          el("div", {}, [
-            el("strong", { text: p.nama }),
-            el("div", { class: "muted small", text: `${p.kategori} · ${rupiah(p.harga)}` }),
+        el("tr", {}, [
+          el("td", { class: "kol-foto", "data-label": "Foto" }, [
+            el("img", { src: p.imageUrl, alt: "", class: "thumb" }),
           ]),
-          el("span", { class: "muted small", text: p.namaPengrajin }),
-          el("span", { class: "row-actions" }, [
-            el("button", {
-              type: "button",
-              class: "btn btn-secondary btn-kecil",
-              text: "Edit",
-              onclick: () => bukaForm(p),
+          el("td", { "data-label": "Nama" }, [
+            el("strong", { text: p.nama }),
+            el("div", { class: "muted small", text: p.namaPengrajin }),
+          ]),
+          el("td", { "data-label": "Kategori" }, [badge(p.kategori, "badge-kategori")]),
+          el("td", { "data-label": "Harga", text: rupiah(p.harga) }),
+          el("td", { "data-label": "Stok" }, [
+            el("span", {
+              class: `stok${p.stok === 0 ? " stok-habis" : ""}`,
+              text: stokLabel(p),
             }),
-            el("button", {
-              type: "button",
-              class: "btn btn-danger btn-kecil",
-              text: "Hapus",
-              onclick: () =>
-                konfirmasi("Hapus produk", `Hapus ${p.nama} dari katalog?`, () => {
-                  hapusProduk(p.id);
-                  perbaruiData();
-                }),
-            }),
+          ]),
+          el("td", { "data-label": "Aksi" }, [
+            el("div", { class: "row-actions" }, [
+              el("button", {
+                type: "button",
+                class: "btn btn-secondary btn-kecil",
+                text: "Edit",
+                onclick: () => bukaForm(p),
+              }),
+              el("button", {
+                type: "button",
+                class: "btn btn-danger btn-kecil",
+                text: "Hapus",
+                onclick: () =>
+                  konfirmasi("Hapus produk", `Hapus ${p.nama} dari katalog?`, () => {
+                    hapusProduk(p.id);
+                    perbaruiData();
+                    beriPesanData("Produk dihapus dari katalog.");
+                  }),
+              }),
+            ]),
           ]),
         ]),
       ),
@@ -588,8 +647,34 @@ function renderDashboard() {
   let draftImage = PLACEHOLDER_IMAGE;
   let editingId = null;
 
-  const field = (id, label, node) =>
-    el("div", { class: "field" }, [el("label", { for: id, text: label }), node]);
+  const fieldErrors = {};
+  const field = (id, label, node, kunci = id) => {
+    const pesan = el("span", { class: "field-error", hidden: true });
+    fieldErrors[kunci] = { pesan, node };
+    return el("div", { class: "field" }, [
+      el("label", { for: id, text: label }),
+      node,
+      pesan,
+    ]);
+  };
+
+  function tampilkanError(errors) {
+    Object.values(fieldErrors).forEach(({ pesan, node }) => {
+      pesan.hidden = true;
+      pesan.textContent = "";
+      node.removeAttribute("aria-invalid");
+    });
+    Object.entries(errors).forEach(([kunci, teks]) => {
+      const target = fieldErrors[kunci];
+      if (!target) return;
+      target.pesan.textContent = teks;
+      target.pesan.hidden = false;
+      target.node.setAttribute("aria-invalid", "true");
+    });
+    const semua = Object.values(errors);
+    panelError.textContent = semua.join(" ");
+    panelError.hidden = semua.length === 0;
+  }
 
   const nama = el("input", { id: "form-nama", type: "text", maxlength: "80", required: true });
   const kategori = el(
@@ -600,6 +685,7 @@ function renderDashboard() {
     ),
   );
   const harga = el("input", { id: "form-harga", type: "number", min: "0", step: "1", required: true });
+  const stok = el("input", { id: "form-stok", type: "number", min: "0", step: "1", required: true });
   const deskripsi = el("textarea", { id: "form-deskripsi", rows: "3", maxlength: "500", required: true });
   const bahan = el("input", { id: "form-bahan", type: "text", maxlength: "120", required: true });
   const pengrajin = el("input", { id: "form-pengrajin", type: "text", maxlength: "80", required: true, value: "Pengrajin Anyam Lestari" });
@@ -634,6 +720,7 @@ function renderDashboard() {
     nama.value = "";
     kategori.value = "";
     harga.value = "";
+    stok.value = "";
     deskripsi.value = "";
     bahan.value = "";
     pengrajin.value = "Pengrajin Anyam Lestari";
@@ -641,7 +728,7 @@ function renderDashboard() {
     file.value = "";
     draftImage = PLACEHOLDER_IMAGE;
     preview.src = draftImage;
-    panelError.hidden = true;
+    tampilkanError({});
     panelSukses.hidden = true;
     fileError.hidden = true;
   }
@@ -659,6 +746,7 @@ function renderDashboard() {
     nama.value = produk.nama;
     kategori.value = produk.kategori;
     harga.value = String(produk.harga);
+    stok.value = Number.isInteger(produk.stok) ? String(produk.stok) : "";
     deskripsi.value = produk.deskripsi;
     bahan.value = produk.bahan;
     pengrajin.value = produk.namaPengrajin;
@@ -670,16 +758,17 @@ function renderDashboard() {
     nama.focus();
   }
 
-  const form = el("form", { class: "form-panel" }, [
+  const form = el("form", { class: "form-panel", novalidate: true }, [
     el("h2", { text: "Form Produk" }),
     panelError,
     panelSukses,
-    field("form-nama", "Nama produk", nama),
-    field("form-kategori", "Kategori", kategori),
-    field("form-harga", "Harga (Rp)", harga),
-    field("form-deskripsi", "Deskripsi", deskripsi),
-    field("form-bahan", "Bahan", bahan),
-    field("form-pengrajin", "Nama pengrajin", pengrajin),
+    field("form-nama", "Nama produk", nama, "nama"),
+    field("form-kategori", "Kategori", kategori, "kategori"),
+    field("form-harga", "Harga (Rp)", harga, "harga"),
+    field("form-stok", "Stok (pcs)", stok, "stok"),
+    field("form-deskripsi", "Deskripsi", deskripsi, "deskripsi"),
+    field("form-bahan", "Bahan", bahan, "bahan"),
+    field("form-pengrajin", "Nama pengrajin", pengrajin, "namaPengrajin"),
     el("div", { class: "field" }, [
       el("label", { for: "form-file", text: "Foto produk (lokal, maksimal 2 MB)" }),
       file,
@@ -707,6 +796,7 @@ function renderDashboard() {
       nama: nama.value,
       kategori: kategori.value,
       harga: harga.value,
+      stok: stok.value,
       deskripsi: deskripsi.value,
       bahan: bahan.value,
       imageUrl: draftImage,
@@ -715,37 +805,67 @@ function renderDashboard() {
     };
     const { errors } = validasiProduk(input);
     if (Object.keys(errors).length) {
-      panelError.textContent = Object.values(errors)[0];
-      panelError.hidden = false;
+      tampilkanError(errors);
       panelSukses.hidden = true;
       return;
     }
 
-    const hasil = editingId
-      ? ubahProduk(editingId, input)
-      : tambahProduk(input);
-
+    const hasil = editingId ? ubahProduk(editingId, input) : tambahProduk(input);
     if (Object.keys(hasil.errors).length) {
-      panelError.textContent = Object.values(hasil.errors)[0];
-      panelError.hidden = false;
+      tampilkanError(hasil.errors);
       return;
     }
 
     perbaruiData();
     if (!hasil.tersimpan) {
-      panelError.textContent = "Perubahan berlaku untuk sesi ini, tetapi localStorage tidak tersedia.";
+      panelError.textContent =
+        "Perubahan berlaku untuk sesi ini, tetapi localStorage tidak tersedia.";
       panelError.hidden = false;
+      beriPesanData("Data tersimpan sementara hanya untuk sesi ini.", "error");
       return;
     }
 
-    panelError.hidden = true;
-    panelSukses.textContent = editingId ? "Produk diperbarui." : "Produk ditambahkan.";
-    panelSukses.hidden = false;
+    const teksSukses = editingId ? "Produk diperbarui." : "Produk ditambahkan.";
     kosongkanForm();
     panel.hidden = true;
+    panelSukses.replaceChildren(
+      document.createTextNode(`${teksSukses} `),
+      el("a", { href: "#/katalog", text: "Lihat di katalog" }),
+    );
+    panelSukses.hidden = false;
+    beriPesanData(teksSukses);
   });
 
   const panel = el("section", { class: "form-panel-wrap", hidden: true }, [form]);
+
+  const fileImport = el("input", {
+    type: "file",
+    accept: "application/json,.json",
+    hidden: true,
+    onchange: async (event) => {
+      const berkas = event.target.files && event.target.files[0];
+      if (!berkas) return;
+      try {
+        const hasil = imporJSON(await berkas.text());
+        beriPesanData(hasil.pesan, hasil.ok ? "success" : "error");
+        if (hasil.ok) perbaruiData();
+      } catch {
+        beriPesanData("Gagal membaca berkas JSON.", "error");
+      }
+      event.target.value = "";
+    },
+  });
+
+  function unduhJSON() {
+    const blob = new Blob([eksporJSON()], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const tautan = el("a", { href: url, download: "karyaku-produk-v1.json" });
+    document.body.append(tautan);
+    tautan.click();
+    tautan.remove();
+    URL.revokeObjectURL(url);
+    beriPesanData("Data produk diekspor ke berkas karyaku-produk-v1.json.");
+  }
 
   const profil = el("section", { class: "artisan-card" }, [
     el("h2", { text: "Profil Pengrajin (Demo)" }),
@@ -774,11 +894,25 @@ function renderDashboard() {
           el("button", {
             type: "button",
             class: "btn btn-secondary",
+            text: "Ekspor JSON",
+            onclick: unduhJSON,
+          }),
+          el("button", {
+            type: "button",
+            class: "btn btn-secondary",
+            text: "Impor JSON",
+            onclick: () => fileImport.click(),
+          }),
+          fileImport,
+          el("button", {
+            type: "button",
+            class: "btn btn-secondary",
             text: "Reset Data Demo",
             onclick: () =>
               konfirmasi("Reset Data Demo", "Kembalikan katalog ke 8 produk contoh?", () => {
                 resetProduk();
                 perbaruiData();
+                beriPesanData("Data demo dikembalikan ke 8 produk contoh.");
               }),
           }),
           el("button", {
@@ -792,13 +926,14 @@ function renderDashboard() {
           }),
         ]),
       ]),
+      dataAlert,
       el("section", { class: "stats" }, [
         el("div", { class: "stat" }, [statProduk, el("span", { text: "Produk" })]),
-        el("div", { class: "stat" }, [statUnggulan, el("span", { text: "Unggulan" })]),
-        el("div", { class: "stat" }, [statKategori, el("span", { text: "Kategori terbanyak" })]),
+        el("div", { class: "stat" }, [statStok, el("span", { text: "Total Stok" })]),
+        el("div", { class: "stat" }, [statKategori, el("span", { text: "Kategori" })]),
       ]),
       panel,
-      daftar,
+      tabel,
       profil,
     ],
   });
