@@ -147,3 +147,58 @@ describe("localStorage — persistensi dan impor/ekspor", () => {
     expect(penyimpananOk()).toBe(false);
   });
 });
+
+describe("localStorage — URL gambar dan batas impor", () => {
+  it("menolak impor dengan imageUrl eksternal atau skema berbahaya", () => {
+    expect(imporJSON(JSON.stringify([{ ...produkImpor(), imageUrl: "//evil.example/x.png" }])).ok).toBe(false);
+    expect(imporJSON(JSON.stringify([{ ...produkImpor(), imageUrl: "javascript:alert(1)" }])).ok).toBe(false);
+    expect(
+      imporJSON(
+        JSON.stringify([
+          {
+            ...produkImpor(),
+            imageUrl: `data:image/svg+xml,${encodeURIComponent("<svg onload='alert(1)'/>")}`,
+          },
+        ]),
+      ).ok,
+    ).toBe(false);
+    expect(isi()).toHaveLength(8);
+  });
+
+  it("memulihkan seed bila localStorage berisi SVG berbahaya", () => {
+    localStorage.setItem(
+      "karyaku:products:v1",
+      JSON.stringify([
+        {
+          ...produkImpor(),
+          imageUrl: `data:image/svg+xml,${encodeURIComponent("<svg onload='alert(1)'/>")}`,
+        },
+      ]),
+    );
+    expect(initStore()).toHaveLength(8);
+    expect(isi()).toHaveLength(8);
+    expect(ambilPemberitahuan()).toContain("Data contoh dipulihkan");
+  });
+
+  it("membatasi jumlah produk hasil impor", () => {
+    const banyak = Array.from({ length: 1001 }, (_, i) => ({
+      ...produkImpor(),
+      id: `prod-${i}`,
+    }));
+    const hasil = imporJSON(JSON.stringify(banyak));
+    expect(hasil.ok).toBe(false);
+    expect(hasil.pesan).toContain("maksimal 1000");
+    expect(isi()).toHaveLength(8);
+  });
+
+  it("menerima tepat 1000 produk dan menolak teks JSON di atas 2 MB", () => {
+    const batas = Array.from({ length: 1000 }, (_, i) => ({
+      ...produkImpor(),
+      id: `prod-${i}`,
+    }));
+    expect(imporJSON(JSON.stringify(batas)).ok).toBe(true);
+    expect(isi()).toHaveLength(1000);
+
+    expect(imporJSON(" ".repeat(2 * 1024 * 1024 + 1)).ok).toBe(false);
+  });
+});

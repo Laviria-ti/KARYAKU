@@ -77,12 +77,47 @@ describe("validasiProduk — field pendukung", () => {
   it("menolak URL gambar eksternal", () => {
     expect(
       validasiProduk({ ...inputValid(), imageUrl: "https://example.com/foto.png" }).errors.imageUrl,
-    ).toBe("Foto harus lokal atau hasil upload, bukan URL eksternal.");
+    ).toBe("Foto harus gambar lokal yang valid (PNG, JPEG, WebP, atau SVG aman).");
   });
 
   it("memakai placeholder bila imageUrl kosong", () => {
     const hasil = validasiProduk({ ...inputValid(), imageUrl: "" });
     expect(hasil.errors.imageUrl).toBeUndefined();
     expect(hasil.value.imageUrl).toContain("data:image/svg+xml");
+  });
+});
+
+describe("validasiProduk — skema URL gambar (F-01, F-02)", () => {
+  const ditolak = (imageUrl) => validasiProduk({ ...inputValid(), imageUrl }).errors.imageUrl;
+
+  it("menolak URL relatif protokol dan http(s)", () => {
+    expect(ditolak("//evil.example/track.png")).toBeDefined();
+    expect(ditolak("https://evil.example/track.png")).toBeDefined();
+    expect(ditolak("HtTp://evil.example/track.png")).toBeDefined();
+  });
+
+  it("menolak skema javascript, data:text/html, dan vbscript", () => {
+    expect(ditolak("javascript:alert(1)")).toBeDefined();
+    expect(ditolak("data:text/html,<script>alert(1)</script>")).toBeDefined();
+    expect(ditolak("vbscript:msgbox(1)")).toBeDefined();
+  });
+
+  it("menolak SVG data URL yang memuat skrip atau event handler", () => {
+    expect(ditolak("data:image/svg+xml,%3Csvg%20onload%3D%22alert(1)%22%2F%3E")).toBeDefined();
+    expect(
+      ditolak(`data:image/svg+xml;base64,${btoa("<svg onload='alert(1)'/>")}`),
+    ).toBeDefined();
+    expect(
+      ditolak(
+        `data:image/svg+xml,${encodeURIComponent("<svg><script>alert(1)</script></svg>")}`,
+      ),
+    ).toBeDefined();
+  });
+
+  it("menerima raster lokal, path lokal, dan SVG bawaan yang aman", () => {
+    expect(ditolak("data:image/png;base64,iVBORw0KGgo=")).toBeUndefined();
+    expect(ditolak("data:image/webp;base64,UklGRiQAAABXRUJQVlA4")).toBeUndefined();
+    expect(ditolak("/gambar/lokal.svg")).toBeUndefined();
+    expect(ditolak(inputValid().imageUrl)).toBeUndefined();
   });
 });

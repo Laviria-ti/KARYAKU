@@ -4,6 +4,8 @@ const KEY_VERSION = "karyaku_schema_version";
 const KEY_PRODUCTS = "karyaku:products:v1";
 const KEY_SESSION = "karyaku_session_v1";
 const SCHEMA = "1";
+const BATAS_IMPOR = 1000;
+const BATAS_TEKS_IMPOR = 2 * 1024 * 1024;
 
 let memory = salinSeed();
 let sessionMemory = false;
@@ -34,8 +36,33 @@ function tulis(key, nilai) {
   }
 }
 
+const GAMBAR_RASTER = /^data:image\/(?:png|jpeg|webp)(?:;[^,]*)?,/i;
+const GAMBAR_SVG = /^data:image\/svg\+xml(?:;[^,]*)?,/i;
+const SVG_BERBAHAYA =
+  /<\s*(?:script|iframe|object|embed|foreignObject)\b|<!\s*(?:DOCTYPE|ENTITY)|<\s*use\b|javascript\s*:|href\s*=\s*["']?(?:https?:|\/\/)|@import|\son[a-z]+\s*=/i;
+
+function isiDataUrl(teks) {
+  const koma = teks.indexOf(",");
+  if (koma < 0) return null;
+  const meta = teks.slice(0, koma);
+  const isi = teks.slice(koma + 1);
+  try {
+    return /;base64/i.test(meta) ? atob(isi) : decodeURIComponent(isi);
+  } catch {
+    return null;
+  }
+}
+
+function svgAman(teks) {
+  const isi = isiDataUrl(teks);
+  return isi !== null && !SVG_BERBAHAYA.test(isi);
+}
+
 function bukanUrlEksternal(nilai) {
-  return !/^https?:\/\//i.test(String(nilai || "").trim());
+  const teks = String(nilai ?? "").trim();
+  if (/^\/(?![\/\\])/.test(teks)) return true;
+  if (GAMBAR_RASTER.test(teks)) return true;
+  return GAMBAR_SVG.test(teks) && svgAman(teks);
 }
 
 function normalisasi(p) {
@@ -102,7 +129,7 @@ export function validasiProduk(input) {
     errors.bahan = "Bahan harus 3–120 karakter.";
   }
   if (!bukanUrlEksternal(value.imageUrl)) {
-    errors.imageUrl = "Foto harus lokal atau hasil upload, bukan URL eksternal.";
+    errors.imageUrl = "Foto harus gambar lokal yang valid (PNG, JPEG, WebP, atau SVG aman).";
   }
   if (value.namaPengrajin.length < 3 || value.namaPengrajin.length > 80) {
     errors.namaPengrajin = "Nama pengrajin harus 3–80 karakter.";
@@ -127,7 +154,7 @@ function produkValid(p) {
 }
 
 function daftarValid(daftar) {
-  if (!Array.isArray(daftar)) return false;
+  if (!Array.isArray(daftar) || daftar.length > BATAS_IMPOR) return false;
   const id = new Set();
   for (const p of daftar) {
     if (!produkValid(p) || id.has(p.id)) return false;
@@ -204,11 +231,19 @@ export function eksporJSON() {
 }
 
 export function imporJSON(teks) {
+  if (typeof teks !== "string" || teks.length > BATAS_TEKS_IMPOR) {
+    return { ok: false, pesan: "Berkas JSON terlalu besar. Maksimal 2 MB." };
+  }
+
   let hasil;
   try {
     hasil = JSON.parse(teks);
   } catch {
     return { ok: false, pesan: "Berkas bukan JSON yang valid." };
+  }
+
+  if (Array.isArray(hasil) && hasil.length > BATAS_IMPOR) {
+    return { ok: false, pesan: `Jumlah produk maksimal ${BATAS_IMPOR}.` };
   }
 
   if (!daftarValid(hasil)) {

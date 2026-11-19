@@ -65,6 +65,19 @@ function stokLabel(produk) {
   return produk.stok > 0 ? `Stok: ${produk.stok} pcs` : "Stok habis";
 }
 
+export function tandaGambarValid(tipe, bytes) {
+  if (!(bytes instanceof Uint8Array)) return false;
+  if (tipe === "image/png")
+    return [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => bytes[i] === v);
+  if (tipe === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (tipe === "image/webp")
+    return (
+      String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+      String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
+    );
+  return false;
+}
+
 function navLink(label, href, aktif) {
   return el("a", {
     class: `nav-link${aktif === label ? " aktif" : ""}`,
@@ -699,21 +712,37 @@ function renderDashboard() {
   const bahan = el("input", { id: "form-bahan", type: "text", maxlength: "120", required: true });
   const pengrajin = el("input", { id: "form-pengrajin", type: "text", maxlength: "80", required: true, value: "Pengrajin Anyam Lestari" });
   const unggulan = el("input", { id: "form-unggulan", type: "checkbox" });
-  const file = el("input", { id: "form-file", type: "file", accept: "image/png,image/jpeg,image/webp,image/svg+xml" });
+  const file = el("input", { id: "form-file", type: "file", accept: "image/png,image/jpeg,image/webp" });
 
-  file.addEventListener("change", () => {
+  file.addEventListener("change", async () => {
     const berkas = file.files && file.files[0];
     if (!berkas) return;
-    const tipeDiterima = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+    const tipeDiterima = ["image/png", "image/jpeg", "image/webp"];
     if (!tipeDiterima.includes(berkas.type) || berkas.size > 2 * 1024 * 1024) {
-      fileError.textContent = "Gunakan PNG/JPEG/WebP/SVG dengan ukuran maksimal 2 MB.";
+      fileError.textContent = "Gunakan PNG/JPEG/WebP dengan ukuran maksimal 2 MB.";
+      fileError.hidden = false;
+      file.value = "";
+      return;
+    }
+    const bytes = new Uint8Array(await berkas.slice(0, 12).arrayBuffer());
+    if (!tandaGambarValid(berkas.type, bytes)) {
+      fileError.textContent = "Isi berkas tidak sesuai dengan format PNG/JPEG/WebP.";
       fileError.hidden = false;
       file.value = "";
       return;
     }
     const pembaca = new FileReader();
     pembaca.onload = () => {
-      draftImage = String(pembaca.result);
+      const dataUrl = String(pembaca.result);
+      if (dataUrl.length > 2 * 1024 * 1024) {
+        fileError.textContent = "Gambar terlalu besar setelah dikonversi.";
+        fileError.hidden = false;
+        file.value = "";
+        draftImage = PLACEHOLDER_IMAGE;
+        preview.src = draftImage;
+        return;
+      }
+      draftImage = dataUrl;
       preview.src = draftImage;
       fileError.hidden = true;
     };
@@ -950,10 +979,16 @@ function renderDashboard() {
   perbaruiData();
 }
 
-function ruteSaatIni() {
+export function ruteSaatIni() {
   const bagian = location.hash.replace(/^#\/?/, "");
   if (bagian.startsWith("produk/")) {
-    return { nama: "detail", id: decodeURIComponent(bagian.slice("produk/".length)) };
+    let id = null;
+    try {
+      id = decodeURIComponent(bagian.slice("produk/".length));
+    } catch {
+      id = null;
+    }
+    return { nama: "detail", id };
   }
   if (bagian === "login") return { nama: "login" };
   if (bagian === "dashboard") return { nama: "dashboard" };
