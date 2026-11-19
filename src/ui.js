@@ -159,7 +159,7 @@ function kartuProduk(produk) {
   );
 }
 
-function daftarTersaring(daftar, filter) {
+export function daftarTersaring(daftar, filter) {
   const kata = filter.q.trim().toLowerCase();
 
   const hasil = daftar.filter((p) => {
@@ -389,11 +389,20 @@ function renderKatalog() {
   perbarui();
 }
 
-function tautanWhatsapp(produk) {
+export function nomorWaValid(nomor) {
+  return /^[1-9]\d{7,14}$/.test(String(nomor ?? "").trim());
+}
+
+export function urlWhatsapp(produk, nomor = DEMO.whatsapp) {
+  if (!nomorWaValid(nomor)) return "";
   const pesan = `Halo KARYAKU, saya tertarik dengan produk ${produk.nama}. Bisa beri informasi lebih lanjut?`;
+  return `https://wa.me/${nomor}?text=${encodeURIComponent(pesan)}`;
+}
+
+function tautanWhatsapp(produk) {
   return el("a", {
     class: "btn btn-primary",
-    href: `https://wa.me/${DEMO.whatsapp}?text=${encodeURIComponent(pesan)}`,
+    href: urlWhatsapp(produk),
     target: "_blank",
     rel: "noopener noreferrer",
     text: "Hubungi via WhatsApp (Demo) (tab baru)",
