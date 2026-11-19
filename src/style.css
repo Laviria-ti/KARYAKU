@@ -414,6 +414,86 @@ a {
   text-align: center;
 }
 
+.kategori-section {
+  padding: 8px 0 56px;
+}
+
+.seksi-head {
+  margin-bottom: 24px;
+}
+
+.seksi-head h2 {
+  margin: 6px 0;
+  font-size: clamp(1.4rem, 3vw, 1.6rem);
+  line-height: 1.25;
+}
+
+.kategori-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kategori-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 120px;
+  padding: 16px;
+  border: 1px solid var(--garis);
+  border-radius: var(--radius);
+  background: var(--cream-tipis);
+  color: var(--charcoal);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.kategori-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--terracotta);
+  box-shadow: var(--bayangan);
+}
+
+.kategori-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: repeating-linear-gradient(45deg, var(--terracotta) 0 6px, #efe3d2 6px 12px);
+}
+
+.mark-1 { background: repeating-linear-gradient(90deg, var(--taupe) 0 6px, #efe3d2 6px 12px); }
+.mark-2 { background: repeating-linear-gradient(135deg, var(--terracotta-deep) 0 6px, #efe3d2 6px 12px); }
+.mark-3 { background: repeating-linear-gradient(0deg, var(--taupe-teks) 0 6px, #efe3d2 6px 12px); }
+.mark-4 { background: repeating-linear-gradient(45deg, var(--terracotta) 0 4px, var(--cream) 4px 8px); }
+
+.kategori-nama {
+  font-size: 17px;
+  text-transform: capitalize;
+}
+
+.kategori-jumlah {
+  color: var(--taupe-teks);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stok {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--taupe-teks);
+}
+
+.stok-habis {
+  color: var(--merah);
+}
+
+.katalog-section {
+  scroll-margin-top: 16px;
+}
+
 .breadcrumb {
   display: flex;
   flex-wrap: wrap;
@@ -672,6 +752,14 @@ a {
     grid-template-columns: 1.1fr 0.9fr;
   }
 
+  .kategori-section {
+    padding-bottom: 80px;
+  }
+
+  .kategori-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .grid-produk {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -710,6 +798,10 @@ a {
 @media (min-width: 1024px) {
   .grid-produk {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .kategori-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 

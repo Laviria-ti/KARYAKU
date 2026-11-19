@@ -57,6 +57,11 @@ function rupiah(nilai) {
   return `Rp${new Intl.NumberFormat("id-ID").format(nilai)}`;
 }
 
+function stokLabel(produk) {
+  if (!Number.isInteger(produk.stok)) return "Stok belum tercantum";
+  return produk.stok > 0 ? `Stok: ${produk.stok} pcs` : "Stok habis";
+}
+
 function navLink(label, href, aktif) {
   return el("a", {
     class: `nav-link${aktif === label ? " aktif" : ""}`,
@@ -131,6 +136,10 @@ function kartuProduk(produk) {
         ]),
         el("h3", { class: "card-title", text: produk.nama }),
         el("p", { class: "price", text: rupiah(produk.harga) }),
+        el("p", {
+          class: `stok${produk.stok === 0 ? " stok-habis" : ""}`,
+          text: stokLabel(produk),
+        }),
         el("p", { class: "muted small", text: produk.namaPengrajin }),
       ]),
     ],
@@ -169,6 +178,54 @@ function daftarTersaring(daftar, filter) {
         (a, b) => Number(b.unggulan) - Number(a.unggulan) || bandingNama(a, b),
       );
   }
+}
+
+function seksiKategori(daftar) {
+  const jumlah = new Map();
+  daftar.forEach((p) => jumlah.set(p.kategori, (jumlah.get(p.kategori) || 0) + 1));
+
+  const keKatalog = (kategori) => {
+    filterState.kategori = kategori;
+    renderKatalog();
+    const target = document.getElementById("katalog");
+    if (!target) return;
+    const halus = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: halus ? "smooth" : "auto", block: "start" });
+  };
+
+  return el("section", { class: "kategori-section", "aria-labelledby": "judul-kategori" }, [
+    el("div", { class: "seksi-head" }, [
+      el("p", { class: "eyebrow", text: "KATEGORI" }),
+      el("h2", { id: "judul-kategori", text: "Jelajahi ragam kerajinan" }),
+      el("p", { class: "muted", text: "Pilih kategori untuk menyaring katalog." }),
+    ]),
+    el(
+      "div",
+      { class: "kategori-grid" },
+      KATEGORI.map((kategori, indeks) =>
+        el(
+          "button",
+          {
+            type: "button",
+            class: "kategori-card",
+            "aria-label": `Lihat produk kategori ${kategori}`,
+            onclick: () => keKatalog(kategori),
+          },
+          [
+            el("span", {
+              class: `kategori-mark mark-${indeks % KATEGORI.length}`,
+              "aria-hidden": "true",
+            }),
+            el("strong", { class: "kategori-nama", text: kategori }),
+            el("span", {
+              class: "kategori-jumlah",
+              text: `${jumlah.get(kategori) || 0} produk`,
+            }),
+          ],
+        ),
+      ),
+    ),
+  ]);
 }
 
 function renderKatalog() {
@@ -273,7 +330,14 @@ function renderKatalog() {
         type: "button",
         class: "btn btn-primary",
         text: "Jelajahi Katalog",
-        onclick: () => cari.focus(),
+        onclick: () => {
+          const target = document.getElementById("katalog");
+          if (target) {
+            const halus = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            target.scrollIntoView({ behavior: halus ? "smooth" : "auto", block: "start" });
+          }
+          cari.focus({ preventScroll: true });
+        },
       }),
     ]),
     el("div", { class: "hero-art", "aria-hidden": "true" }, [
@@ -302,7 +366,13 @@ function renderKatalog() {
     }),
   ]);
 
-  layout({ aktif: "katalog", children: [hero, toolbar, ringkasan, grid] });
+  const katalog = el("section", { id: "katalog", class: "katalog-section" }, [
+    toolbar,
+    ringkasan,
+    grid,
+  ]);
+
+  layout({ aktif: "katalog", children: [hero, seksiKategori(produk), katalog] });
   perbarui();
 }
 
