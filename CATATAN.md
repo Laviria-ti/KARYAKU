@@ -31,3 +31,29 @@ Cakupan produk berasal dari berbagai daerah, dengan fokus awal pada kerajinan lo
 
 ## 4. Risiko Penggunaan AI
 AI berpotensi menghasilkan kode yang tidak sesuai kebutuhan, mengandung kesalahan, atau memiliki celah keamanan. Oleh karena itu, setiap kode dan perubahan yang dihasilkan AI harus diperiksa dan diuji sebelum digunakan.
+
+
+## Hasil Deployment KARYAKU
+
+### Repository dan Deployment
+- GitHub: https://github.com/Laviria-ti/KARYAKU
+- Website: https://karyaku-beryl.vercel.app
+- Branch utama: `main`
+- Platform deployment: Vercel
+- Framework: Vite
+
+### Hasil Pengujian
+- Unit test: 52 berhasil, 0 gagal.
+- Build production: berhasil.
+- Deployment Vercel: berhasil.
+- Repository GitHub: berhasil terhubung dan di-push.
+
+### Batasan Aplikasi
+- Data produk disimpan menggunakan localStorage pada browser.
+- Login masih berupa simulasi dan belum menggunakan backend.
+- Aplikasi belum memiliki database server.
+- WhatsApp menggunakan tautan kontak demo.
+
+### Catatan Lanjutan
+- Periksa kembali navigasi Beranda, Katalog, dan Login Pengrajin pada website online.
+- Pengembangan backend dan autentikasi sungguhan masih dapat dilakukan pada tahap berikutnya.
