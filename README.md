@@ -146,7 +146,17 @@ npm run preview
 
 ## 7. Deployment Vercel
 
-Aplikasi ini adalah situs statis hasil Vite, sehingga dapat di-deploy ke Vercel tanpa server tambahan. Repository **belum** menyimpan `vercel.json`; pengaturan berikut dimasukkan di dashboard Vercel saat membuat proyek:
+Aplikasi ini adalah situs statis hasil Vite, sehingga dapat di-deploy ke Vercel tanpa server tambahan. Deployment aktual:
+
+| Informasi | Nilai |
+| --- | --- |
+| Repository | https://github.com/Laviria-ti/KARYAKU |
+| Website | https://karyaku-beryl.vercel.app |
+| Branch utama | `main` |
+| Platform | Vercel |
+| Framework | Vite |
+
+Repository **belum** menyimpan `vercel.json`; pengaturan berikut dimasukkan di dashboard Vercel saat membuat proyek:
 
 | Pengaturan | Nilai |
 | --- | --- |
@@ -161,7 +171,8 @@ Catatan deployment:
 
 - Navigasi memakai hash (`#/katalog`, `#/produk/...`, `#/login`, `#/dashboard`), sehingga tidak memerlukan aturan *rewrite* SPA.
 - Tidak ada API, serverless function, cookie, atau rahasia yang perlu dikonfigurasi.
-- Setelah deploy, pastikan delapan produk tampil, ilustrasi termuat, dan tautan WhatsApp demo membuka tab baru.
+- Pada website online, delapan produk dan lima kategori tampil dengan ilustrasi termuat; menu Beranda dan logo kembali ke atas halaman, menu Katalog mengarah ke daftar produk, dan Login Pengrajin membuka form login.
+- Hasil pengujian terakhir: 52 unit test berhasil, 0 gagal; build produksi dan deployment Vercel berhasil.
 - Jika diperlukan, tambahkan header keamanan (misalnya CSP dan `X-Content-Type-Options: nosniff`) melalui konfigurasi hosting; repository ini belum menyimpannya.
 - Data pengguna tetap berada di `localStorage` browser masing-masing, bukan di Vercel.
 
