@@ -16,6 +16,7 @@ import {
 } from "./store.js";
 
 let root = null;
+let scrollTujuan = null;
 
 const filterState = {
   q: "",
@@ -78,25 +79,61 @@ export function tandaGambarValid(tipe, bytes) {
   return false;
 }
 
-function navLink(label, href, aktif) {
+function navLink(label, href, aktif, onclick) {
   return el("a", {
     class: `nav-link${aktif === label ? " aktif" : ""}`,
     href,
     "aria-current": aktif === label ? "page" : null,
     text: label,
+    onclick,
   });
+}
+
+function scrollKe(target) {
+  const halus = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ behavior: halus ? "smooth" : "auto", block: "start" });
+}
+
+function terapkanScrollTujuan() {
+  if (!scrollTujuan) return;
+  const bagian = scrollTujuan;
+  scrollTujuan = null;
+  if (bagian === "atas") {
+    const halus = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: halus ? "smooth" : "auto" });
+    return;
+  }
+  const target = document.getElementById("katalog");
+  if (target) scrollKe(target);
+}
+
+function keBagian(bagian, event) {
+  event.preventDefault();
+  scrollTujuan = bagian;
+  if (location.hash === "#/katalog") {
+    terapkanScrollTujuan();
+  } else {
+    location.hash = "#/katalog";
+  }
 }
 
 function layout({ aktif = "", badge = "", children = [] }) {
   const navbar = el("header", { class: "navbar" }, [
-    el("a", { class: "logo", href: "#/katalog" }, [
-      el("span", { class: "logo-mark", "aria-hidden": "true" }),
-      el("span", { text: "KARYAKU" }),
-    ]),
+    el(
+      "a",
+      {
+        class: "logo",
+        href: "#/katalog",
+        onclick: (event) => keBagian("atas", event),
+      },
+      [
+        el("span", { class: "logo-mark", "aria-hidden": "true" }),
+        el("span", { text: "KARYAKU" }),
+      ],
+    ),
     el("nav", { class: "nav-links", "aria-label": "Navigasi utama" }, [
-      navLink("Beranda", "#/katalog", aktif),
-      navLink("Katalog", "#/katalog", aktif),
-      navLink("Tentang", "#/katalog", aktif),
+      navLink("Beranda", "#/katalog", aktif, (event) => keBagian("atas", event)),
+      navLink("Katalog", "#/katalog", aktif, (event) => keBagian("katalog", event)),
       aktif === "dashboard"
         ? el("span", { class: "badge demo-badge", text: "MODE DEMO" })
         : navLink("Login Pengrajin", "#/login", aktif),
@@ -400,6 +437,7 @@ function renderKatalog() {
 
   layout({ aktif: "katalog", children: [hero, seksiKategori(produk), katalog] });
   perbarui();
+  terapkanScrollTujuan();
 }
 
 export function nomorWaValid(nomor) {
